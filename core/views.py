@@ -52,7 +52,7 @@ class VideoViewset(viewsets.ModelViewSet):
                     delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
                 )
             )
-            channel.close()
+            # channel.close()
         except Exception as err:
             print(err)
             # instance = get_object_or_404(VideoFile, pk=video.pk)
