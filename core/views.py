@@ -3,13 +3,16 @@ import pika
 import os
 import tempfile
 import moviepy.editor
+import io
 
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import send_mail
+from django.http.response import FileResponse
 
 from rest_framework import viewsets, status, exceptions
 from rest_framework.response import Response
+from rest_framework.decorators import api_view
 
 from core.models import AudioFile, VideoFile
 from core.serializers import VideoSerializer
@@ -128,3 +131,16 @@ def sent_notification(message):
     except Exception as err:
         print(err)
         return "error"
+
+
+@api_view(["GET"])
+def download_audio(request, id):
+    audio_data = get_object_or_404(AudioFile, pk=id)
+    audio = io.BytesIO(audio_data.audio)
+    audio.seek(0)
+    response = FileResponse(
+        audio,
+        as_attachment=True,
+        filename=f"porxidev_{str(audio_data.pk)}.mp3"
+    )
+    return response
