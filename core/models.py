@@ -7,3 +7,7 @@ class VideoFile(models.Model):
 
     def __str__(self) -> str:
         return self.pk
+
+
+class AudioFile(models.Model):
+    audio = models.BinaryField()

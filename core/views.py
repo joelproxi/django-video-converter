@@ -1,12 +1,15 @@
 import json
 import pika
 import os
+import tempfile
+import moviepy.editor
 
+from django.shortcuts import get_object_or_404
 
 from rest_framework import viewsets, status, exceptions
 from rest_framework.response import Response
 
-from core.models import VideoFile
+from core.models import AudioFile, VideoFile
 from core.serializers import VideoSerializer
 
 
@@ -54,3 +57,45 @@ class VideoViewset(viewsets.ModelViewSet):
 
         os.remove(str(video.video))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+def video_from_db(video_id):
+    video = get_object_or_404(VideoFile, pk=video_id)
+    return video
+
+
+def start_convert(ch, message):
+    video_id = message.get('video_id')
+    video_instance = video_from_db(video_id)
+    tf = tempfile.NamedTemporaryFile()
+    tf.write(video_instance.video_data)
+
+    audio = moviepy.editor.VideoFileClip(tf.name).audio
+    audio_path = f"{str(video_instance.video)[:-4]}_proxidev.mp3"
+    audio.write_audiofile(audio_path)
+    tf.close()
+
+    f = open(audio_path, 'rb')
+    data = f.read()
+    audio = AudioFile.objects.create(
+        audio=data
+    )
+    f.close()
+
+    message['audio_id'] = str(audio.pk)
+    try:
+        ch.basic_publish(
+            exchange="",
+            routing_key="audio",
+            body=json.dumps(message),
+            properties=pika.BasicProperties(
+                delivery_mode=pika.spec.PERSISTENT_DELIVERY_MODE
+            )
+        )
+        os.remove(str(audio_path))
+    except Exception as err:
+        print(err)
+        audio = get_object_or_404(AudioFile, pk=audio.pk)
+        audio.delete()
+        os.remove(str(audio_path))
+        return "Error"
